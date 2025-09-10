@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expert Reviews Platform</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:0; }
+    header { background:#222; color:#fff; padding:15px; text-align:center; }
+    nav { background:#444; padding:10px; text-align:center; }
+    nav button { margin:5px; padding:10px 15px; cursor:pointer; border:none; border-radius:5px; }
+    .container { padding:20px; }
+    .hidden { display:none; }
+    .card { background:#fff; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.2); padding:15px; margin-bottom:15px; }
+    .product { display:flex; justify-content:space-between; align-items:center; }
+    .invoice { background:#fff; padding:15px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.2); margin-top:15px; }
+    input, select { padding:8px; margin:5px 0; width:100%; }
+    button.action { background:#28a745; color:#fff; }
+    button.danger { background:#dc3545; color:#fff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Expert-driven Product Reviews & Shopping</h1>
+  </header>
+
+  <div id="login-section" class="container">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p>Don’t have an account? <button onclick="showSignup()">Sign Up</button></p>
+  </div>
+
+  <div id="signup-section" class="hidden container">
+    <h2>Sign Up</h2>
+    <input type="text" id="signup-username" placeholder="Choose Username">
+    <input type="password" id="signup-password" placeholder="Choose Password">
+    <button onclick="signup()">Register</button>
+    <p>Already have an account? <button onclick="showLogin()">Login</button></p>
+  </div>
+
+  <div id="user-section" class="hidden container">
+    <h2>Welcome, <span id="user-name"></span></h2>
+    <h3>Products</h3>
+    <div id="product-list"></div>
+    <h3>Cart</h3>
+    <div id="cart"></div>
+    <button class="action" onclick="checkout()">Checkout</button>
+    <div id="invoice" class="invoice hidden"></div>
+  </div>
+
+  <div id="admin-section" class="hidden container">
+    <h2>Admin Dashboard</h2>
+    <h3>Manage Products</h3>
+    <input type="text" id="newProductName" placeholder="Product name">
+    <input type="number" id="newProductPrice" placeholder="Price">
+    <button class="action" onclick="addProduct()">Add Product</button>
+    <div id="admin-products"></div>
+
+    <h3>Orders</h3>
+    <div id="orders"></div>
+  </div>
+
+  <script>
+    let products = JSON.parse(localStorage.getItem('products')) || [
+      {id:1,name:'Laptop Pro',price:70000},
+      {id:2,name:'Smartphone X',price:50000}
+    ];
+    let cart = [];
+    let orders = JSON.parse(localStorage.getItem('orders')) || [];
+    let users = JSON.parse(localStorage.getItem('users')) || [
+      {username:'admin', password:'admin', role:'admin'},
+      {username:'user', password:'user', role:'user'}
+    ];
+
+    function saveData(){
+      localStorage.setItem('products', JSON.stringify(products));
+      localStorage.setItem('orders', JSON.stringify(orders));
+      localStorage.setItem('users', JSON.stringify(users));
+    }
+
+    function showSignup(){
+      document.getElementById('login-section').classList.add('hidden');
+      document.getElementById('signup-section').classList.remove('hidden');
+    }
+
+    function showLogin(){
+      document.getElementById('signup-section').classList.add('hidden');
+      document.getElementById('login-section').classList.remove('hidden');
+    }
+
+    function signup(){
+      let u=document.getElementById('signup-username').value;
+      let p=document.getElementById('signup-password').value;
+      if(!u || !p){ alert('Fill all fields'); return; }
+      if(users.find(x=>x.username===u)){ alert('Username exists'); return; }
+      users.push({username:u, password:p, role:'user'});
+      saveData();
+      alert('Account created! Please login.');
+      showLogin();
+    }
+
+    function login(){
+      let u=document.getElementById('username').value;
+      let p=document.getElementById('password').value;
+      let found=users.find(x=>x.username===u && x.password===p);
+      if(found){
+        document.getElementById('login-section').classList.add('hidden');
+        document.getElementById('signup-section').classList.add('hidden');
+        if(found.role==='admin'){
+          document.getElementById('admin-section').classList.remove('hidden');
+          renderAdminProducts();
+          renderOrders();
+        } else {
+          document.getElementById('user-section').classList.remove('hidden');
+          document.getElementById('user-name').innerText=u;
+          renderProducts();
+          renderCart();
+        }
+      } else {
+        alert('Invalid credentials');
+      }
+    }
+
+    // User section
+    function renderProducts(){
+      let list=document.getElementById('product-list');
+      list.innerHTML='';
+      products.forEach(p=>{
+        let div=document.createElement('div');
+        div.className='card product';
+        div.innerHTML=`<span>${p.name} - ₹${p.price}</span><button onclick="addToCart(${p.id})">Add to Cart</button>`;
+        list.appendChild(div);
+      });
+    }
+
+    function addToCart(id){
+      let prod=products.find(p=>p.id===id);
+      cart.push(prod);
+      renderCart();
+    }
+
+    function renderCart(){
+      let c=document.getElementById('cart');
+      c.innerHTML='';
+      cart.forEach((p,i)=>{
+        let div=document.createElement('div');
+        div.className='card';
+        div.innerHTML=`${p.name} - ₹${p.price} <button class="danger" onclick="removeCart(${i})">Remove</button>`;
+        c.appendChild(div);
+      });
+    }
+
+    function removeCart(i){
+      cart.splice(i,1);
+      renderCart();
+    }
+
+    function checkout(){
+      if(cart.length===0){ alert('Cart empty'); return; }
+      let total=cart.reduce((sum,p)=>sum+p.price,0);
+      let order={id:Date.now(), items:[...cart], total:total};
+      orders.push(order);
+      saveData();
+      let inv=document.getElementById('invoice');
+      inv.classList.remove('hidden');
+      inv.innerHTML=`<h4>Invoice #${order.id}</h4>` + order.items.map(p=>`<div>${p.name} - ₹${p.price}</div>`).join('')+`<hr><b>Total: ₹${order.total}</b>`;
+      cart=[];
+      renderCart();
+      renderOrders();
+    }
+
+    // Admin section
+    function renderAdminProducts(){
+      let list=document.getElementById('admin-products');
+      list.innerHTML='';
+      products.forEach((p,i)=>{
+        let div=document.createElement('div');
+        div.className='card';
+        div.innerHTML=`${p.name} - ₹${p.price} <button class="danger" onclick="deleteProduct(${i})">Delete</button>`;
+        list.appendChild(div);
+      });
+    }
+
+    function addProduct(){
+      let name=document.getElementById('newProductName').value;
+      let price=parseInt(document.getElementById('newProductPrice').value);
+      if(name && price){
+        products.push({id:Date.now(),name,price});
+        saveData();
+        renderAdminProducts();
+        document.getElementById('newProductName').value='';
+        document.getElementById('newProductPrice').value='';
+      }
+    }
+
+    function deleteProduct(i){
+      products.splice(i,1);
+      saveData();
+      renderAdminProducts();
+    }
+
+    function renderOrders(){
+      let o=document.getElementById('orders');
+      if(!o) return;
+      o.innerHTML='';
+      orders.forEach(order=>{
+        let div=document.createElement('div');
+        div.className='card';
+        div.innerHTML=`<h4>Order #${order.id}</h4>` + order.items.map(p=>`<div>${p.name} - ₹${p.price}</div>`).join('')+`<hr><b>Total: ₹${order.total}</b>`;
+        o.appendChild(div);
+      });
+    }
+  </script>
+</body>
+</html>

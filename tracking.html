@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>expert-driven product review platefrom</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background:#f4f6f8; margin:0; }
+    header { background:#0b5cff; color:#fff; padding:18px 16px; text-align:center; }
+    .container { max-width:1000px; margin:20px auto; padding:12px; }
+    .card { background:#fff; padding:12px; border-radius:10px; box-shadow:0 4px 16px rgba(12,24,60,0.06); margin-bottom:12px; }
+    .flex { display:flex; gap:12px; align-items:center; }
+    .product-row, .order-row, .user-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eef2f8; }
+    input, select { padding:8px; border-radius:6px; border:1px solid #dbe6ff; }
+    button { padding:8px 12px; border-radius:6px; border:0; cursor:pointer; }
+    .btn-primary { background:#0b5cff; color:#fff }
+    .btn-danger { background:#dc3545; color:#fff }
+    .small { font-size:13px; color:#475569 }
+    .hidden { display:none }
+    .status-pill { padding:6px 10px; border-radius:999px; color:#fff; font-size:13px }
+    .Pending { background:#f59e0b }
+    .Shipped { background:#06b6d4 }
+    .Delivered { background:#10b981 }
+    footer { text-align:center; color:#94a3b8; margin:24px 0 }
+    .highlight {
+  font-weight: bold;
+  color: rgb(255, 0, 0);
+}
+
+  </style>
+</head>
+<body>
+  <header>
+    <h1>expert-driven product review platefrom</h1>
+  </header>
+
+  <div class="container">
+    <!-- Login / Signup -->
+    <div id="auth-card" class="card">
+      <div id="login-view">
+        <h3>Login</h3>
+        <div class="flex">
+          <input id="username" placeholder="Username" />
+          <input id="password" type="password" placeholder="Password" />
+          <button class="btn-primary" onclick="login()">Login</button>
+        </div>
+        <p class="small">No account? <button onclick="showSignup()">Sign up</button></p>
+      </div>
+
+      <div id="signup-view" class="hidden">
+        <h3>Sign Up</h3>
+        <div class="flex">
+          <input id="signup-username" placeholder="Username" />
+          <input id="signup-password" type="password" placeholder="Password" />
+          <select id="signup-role"><option value="user">User</option><option value="admin">Admin</option></select>
+          <button class="btn-primary" onclick="signup()">Register</button>
+        </div>
+        <p class="small">Have an account? <button onclick="showLogin()">Back to login</button></p>
+      </div>
+    </div>
+
+    <!-- User dashboard -->
+    <div id="user-dashboard" class="hidden">
+      <div class="card">
+        <div class="flex" style="justify-content:space-between">
+          <div>
+            <h2>Welcome, <span id="currentUserName"></span></h2>
+            <div class="small">You can shop, checkout, and track orders here.</div>
+          </div>
+          <div class="flex">
+            <button onclick="logout()">Logout</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Products</h3>
+        <div id="product-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>Your Cart</h3>
+        <div id="cart-list"></div>
+        <div class="flex" style="justify-content:space-between;margin-top:12px">
+          <div class="small" id="cart-summary">Subtotal: ₹0 | Tax: ₹0 | Total: ₹0</div>
+          <div>
+            <button class="btn-primary" onclick="checkout()">Checkout</button>
+            <button onclick="clearCart()">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Your Orders</h3>
+        <div id="user-orders"></div>
+      </div>
+    </div>
+
+    <!-- Admin dashboard -->
+    <div id="admin-dashboard" class="hidden">
+      <div class="card">
+        <div class="flex" style="justify-content:space-between">
+          <div>
+            <h2>Admin Panel</h2>
+            <div class="small">Manage products, users and orders</div>
+          </div>
+          <div class="flex">
+            <button onclick="logout()">Logout</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Manage Users</h3>
+        <div id="admin-users"></div>
+      </div>
+
+      <div class="card">
+        <h3>Manage Products</h3>
+        <div class="flex">
+          <input id="newProductName" placeholder="Product name" />
+          <input id="newProductPrice" placeholder="Price" type="number" />
+          <button class="btn-primary" onclick="addProduct()">Add Product</button>
+        </div>
+        <div id="admin-products" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <h3>All Orders (Update delivery status)</h3>
+        <div id="admin-orders"></div>
+      </div>
+    </div>
+
+    
+  </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    // --- Config ---
+    const TAX_RATE = 0.18;
+
+    // --- App state persisted in localStorage ---
+    let users = JSON.parse(localStorage.getItem('er_users')) || [
+      { username: 'admin', password: 'admin', role: 'admin' },
+      { username: 'user', password: 'user', role: 'user' }
+    ];
+
+    let products = JSON.parse(localStorage.getItem('er_products')) || [
+      { id: 1, name: 'ZenBook X', price: 79990 },
+      { id: 2, name: 'Pixelate 9', price: 65999 },
+      { id: 3, name: 'HyperPods', price: 8990 }
+    ];
+
+    let orders = JSON.parse(localStorage.getItem('er_orders')) || [];
+
+    let currentUser = null; // {username, role}
+    let cart = [];
+
+    function persist(){
+      localStorage.setItem('er_users', JSON.stringify(users));
+      localStorage.setItem('er_products', JSON.stringify(products));
+      localStorage.setItem('er_orders', JSON.stringify(orders));
+    }
+
+    // --- Auth UI ---
+    function showSignup(){ document.getElementById('login-view').classList.add('hidden'); document.getElementById('signup-view').classList.remove('hidden'); }
+    function showLogin(){ document.getElementById('signup-view').classList.add('hidden'); document.getElementById('login-view').classList.remove('hidden'); }
+
+    function signup(){
+      const u = document.getElementById('signup-username').value.trim();
+      const p = document.getElementById('signup-password').value.trim();
+      const r = document.getElementById('signup-role').value;
+      if(!u || !p) return alert('Fill username and password');
+      if(users.some(x=>x.username===u)) return alert('Username already exists');
+      users.push({ username: u, password: p, role: r }); persist(); alert('Account created — you can login now'); showLogin();
+    }
+
+    function login(){
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value;
+      const found = users.find(x=>x.username===u && x.password===p);
+      if(!found) return alert('Invalid credentials');
+      currentUser = { username: found.username, role: found.role };
+      cart = [];
+      renderForRole();
+    }
+
+    function logout(){ currentUser = null; cart = []; document.getElementById('login-view').classList.remove('hidden'); document.getElementById('signup-view').classList.add('hidden'); document.getElementById('user-dashboard').classList.add('hidden'); document.getElementById('admin-dashboard').classList.add('hidden'); }
+
+    // --- Render depending on role ---
+    function renderForRole(){
+      document.getElementById('login-view').classList.add('hidden'); document.getElementById('signup-view').classList.add('hidden');
+      if(currentUser.role === 'admin'){
+        document.getElementById('admin-dashboard').classList.remove('hidden'); document.getElementById('user-dashboard').classList.add('hidden');
+        renderAdminUsers(); renderAdminProducts(); renderAdminOrders();
+      } else {
+        document.getElementById('user-dashboard').classList.remove('hidden'); document.getElementById('admin-dashboard').classList.add('hidden');
+        document.getElementById('currentUserName').textContent = currentUser.username; renderProducts(); renderCart(); renderUserOrders();
+      }
+    }
+
+    // --- Products ---
+    function renderProducts(){
+      const list = document.getElementById('product-list'); list.innerHTML = '';
+      products.forEach(p => {
+        const row = document.createElement('div'); row.className = 'product-row';
+        row.innerHTML = `<div><strong>${p.name}</strong><div class="small">₹ ${p.price.toLocaleString()}</div></div><div class="flex"><button onclick="addToCart(${p.id})" class="btn-primary">Add</button></div>`;
+        list.appendChild(row);
+      });
+    }
+
+    function addToCart(id){ const p = products.find(x=>x.id===id); if(!p) return; cart.push(id); renderCart(); }
+
+    function renderCart(){ const el = document.getElementById('cart-list'); el.innerHTML=''; if(cart.length===0){ el.innerHTML='<div class="small">Cart is empty</div>'; updateCartSummary(0); return; }
+      const counts = cart.reduce((acc,id)=>{ acc[id]=(acc[id]||0)+1; return acc; },{});
+      let subtotal=0;
+      Object.keys(counts).forEach(k=>{ const p=products.find(x=>x.id===Number(k)); const q=counts[k]; const line=p.price*q; subtotal+=line; const row=document.createElement('div'); row.className='card'; row.innerHTML=`<div style="display:flex;justify-content:space-between"><div>${p.name} x${q}</div><div>₹ ${line.toFixed(2)}</div></div>`; el.appendChild(row); });
+      const tax = round2(subtotal * TAX_RATE); const total = round2(subtotal + tax); updateCartSummary(subtotal, tax, total);
+    }
+
+    function updateCartSummary(subtotal=0, tax=0, total=0){ document.getElementById('cart-summary').textContent = `Subtotal: ₹${subtotal.toFixed(2)} | Tax: ₹${tax.toFixed(2)} | Total: ₹${total.toFixed(2)}`; }
+    function clearCart(){ cart=[]; renderCart(); }
+
+    function checkout(){ if(!currentUser) return alert('Login first'); if(cart.length===0) return alert('Cart empty'); const subtotal = cart.reduce((s,id)=> s + products.find(p=>p.id===id).price, 0); const tax = round2(subtotal*TAX_RATE); const total = round2(subtotal+tax); const order = { id: Date.now(), user: currentUser.username, items: [...cart], subtotal: round2(subtotal), tax, total, status: 'Pending', createdAt: new Date().toISOString() }; orders.push(order); persist(); cart=[]; renderCart(); renderUserOrders(); renderAdminOrders(); alert('Order placed. Invoice will be available in your orders.'); }
+
+    // --- Orders UI for user ---
+    function renderUserOrders(){ const el = document.getElementById('user-orders'); el.innerHTML=''; const my = orders.filter(o=>o.user===currentUser.username); if(my.length===0){ el.innerHTML='<div class="small">No orders yet</div>'; return; } my.slice().reverse().forEach(o=>{ const div=document.createElement('div'); div.className='card order-row'; const counts = o.items.reduce((a,id)=>{ a[id]=(a[id]||0)+1; return a; },{}); const itemsHtml = Object.keys(counts).map(k=>{ const p = products.find(x=>x.id===Number(k)); return `${p.name} x${counts[k]}`; }).join('<br>'); div.innerHTML = `<div><strong>Order #${o.id}</strong><div class="small">${new Date(o.createdAt).toLocaleString()}</div><div class="small">${itemsHtml}</div></div><div style="text-align:right"><div class="status-pill ${o.status}">${o.status}</div><div style="margin-top:8px"><button onclick="downloadInvoice(${o.id})">Download Bill</button></div></div>`; el.appendChild(div); }); }
+
+    // --- Admin: manage users/products/orders ---
+    function renderAdminUsers(){ const el=document.getElementById('admin-users'); el.innerHTML=''; users.forEach((u,i)=>{ const div=document.createElement('div'); div.className='user-row card'; div.innerHTML = `<div>${u.username} (${u.role})</div><div><button class="btn-danger" onclick="deleteUser(${i})">Delete</button></div>`; el.appendChild(div); }); }
+    function deleteUser(i){ if(users[i].role==='admin') return alert('Cannot delete admin'); users.splice(i,1); persist(); renderAdminUsers(); }
+
+    function renderAdminProducts(){ const el=document.getElementById('admin-products'); el.innerHTML=''; products.forEach((p,i)=>{ const div=document.createElement('div'); div.className='product-row card'; div.innerHTML = `<div>${p.name} — ₹${p.price}</div><div><button class="btn-danger" onclick="deleteProduct(${i})">Delete</button></div>`; el.appendChild(div); }); }
+    function addProduct(){ const name=document.getElementById('newProductName').value.trim(); const price=Number(document.getElementById('newProductPrice').value); if(!name||!price) return alert('Provide name and price'); const id = (products.length? Math.max(...products.map(p=>p.id)):0)+1; products.push({id,name,price}); persist(); document.getElementById('newProductName').value=''; document.getElementById('newProductPrice').value=''; renderAdminProducts(); renderProducts(); }
+    function deleteProduct(i){ products.splice(i,1); persist(); renderAdminProducts(); renderProducts(); }
+
+    function renderAdminOrders(){ const el=document.getElementById('admin-orders'); el.innerHTML=''; orders.slice().reverse().forEach(o=>{ const div=document.createElement('div'); div.className='card order-row'; const counts = o.items.reduce((a,id)=>{ a[id]=(a[id]||0)+1; return a; },{}); const itemsHtml = Object.keys(counts).map(k=>{ const p = products.find(x=>x.id===Number(k)); return `${p.name} x${counts[k]}`; }).join('<br>'); div.innerHTML = `<div><strong>Order #${o.id}</strong> <div class="small">User: ${o.user}</div><div class="small">${new Date(o.createdAt).toLocaleString()}</div><div class="small">${itemsHtml}</div></div><div style="text-align:right"><select onchange="updateOrderStatus(${o.id}, this.value)"><option ${o.status==='Pending'?'selected':''}>Pending</option><option ${o.status==='Shipped'?'selected':''}>Shipped</option><option ${o.status==='Delivered'?'selected':''}>Delivered</option></select><div style="margin-top:8px"><button onclick="downloadInvoice(${o.id})">Bill</button></div></div>`; el.appendChild(div); }); }
+
+    function updateOrderStatus(orderId, status){ const o = orders.find(x=>x.id===orderId); if(!o) return; o.status = status; persist(); renderAdminOrders(); renderUserOrders(); }
+
+    // --- Invoice / bill generation and download ---
+    <!-- Add jsPDF in your HTML (only once in your project) -->
+
+
+
+function downloadInvoice(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) return alert('Order not found');
+
+  const counts = o.items.reduce((a, id) => {
+    a[id] = (a[id] || 0) + 1;
+    return a;
+  }, {});
+
+  // Build invoice text
+  let txt = `Invoice No: ${o.id}\n`;
+  txt += `Date: ${new Date(o.createdAt).toLocaleString()}\n`;
+  txt += `User: ${o.user}\n\n`;
+  txt += `ID | Product | Qty | UnitPrice | LineTotal\n`;
+  txt += `------------------------------------------------\n`;
+
+  Object.keys(counts).forEach(k => {
+    const p = products.find(x => x.id === Number(k));
+    const q = counts[k];
+    const line = round2(p.price * q);
+    txt += `${p.id} | ${p.name} | ${q} | ${p.price} | ${line}\n`;
+  });
+
+  txt += `\nSubtotal: ${o.subtotal}`;
+  txt += `\nTax (${TAX_RATE * 100}%): ${o.tax}`;
+  txt += `\nTOTAL: ${o.total}`;
+  txt += `\nStatus: ${o.status}\n`;
+
+  // Create PDF
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont("courier", "normal");  // monospaced for better alignment
+  doc.setFontSize(12);
+
+  const lines = doc.splitTextToSize(txt, 180); // wrap text to fit page
+  doc.text(lines, 15, 20);
+
+  // Save as PDF
+  doc.save(`invoice-${o.id}.pdf`);
+}
+
+
+    // --- Utilities ---
+    function round2(x){ return Math.round(x*100)/100; }
+
+    // --- Init ---
+    persist(); // ensure defaults saved
+    // optional: show login view by default (already visible)
+  </script>
+  <footer>
+  <p>© 2025 | Created for <span class="highlight">Subish</span></p>
+</footer>
+
+
+</body>
+</html>
